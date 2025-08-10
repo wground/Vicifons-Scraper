@@ -45,7 +45,7 @@ The Vicifons Scraper is a sophisticated tool designed to harvest Latin literary 
 
 <div class="elegant-list">
 
-**🔧 Post-Processor** (`post_process_indices.py`)
+** Post-Processor** (`post_process_indices.py`)
 - Detects incorrectly saved index files containing only chapter lists
 - Cross-validates with categoria:capita ex operibus
 - Downloads individual chapters to replace index files
