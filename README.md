@@ -1,7 +1,7 @@
 # **VICIFONS SCRAPER**
 *Comprehensive Latin Text Harvester for la.wikisource.org*
 
-## **USER COMMENTS**
+## **COMMENTS**
 
 I would really like to go to bed soon. The main goal of this project is to scrape texts so that I can use them as training data for something else. This is the first time I've done something like this. I just read about half of a book on Python today and most of this was done with Claude Code. If it weren't the middle of the night I'm sure it'd be better. I am sure there are millions of better ways to build a text scraper, but this is my "learning experience" / poor attempt.
 
@@ -135,5 +135,5 @@ The complete system successfully processes major classical works including:
 - **Ab Urbe Condita** (140+ periochae) → Complete chapter breakdown  
 - **Commentarii de bello Gallico** (8 books) → Full campaign narratives
 - **Noctes Atticae** (20 books) → Complete miscellanea
-
+    *This stuff is a bit of a mess, I'm really sorry.*
 ---
