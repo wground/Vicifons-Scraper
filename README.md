@@ -3,7 +3,9 @@
 ## Notes
 
 August 12: Improved removal of chapter headings. Still need to look into caching problems if I ever need to re-scrape, or repurpose this code to scrape something else.
+
 August 11: Revised everything and updated to current version, merging scraping and cleaning functionality. Spent a lot of time trying to figure out the best way to scale scraping, though I'm still not really certain that we're good. There is a known issue with caching harming download speed about halfway throught the Vicifons filtered corpus. You may ask me: 'couldn't this be much easier if you just took directly from the XML datadump?' I answer: yes, but.
+
 August 9: I would really like to go to bed soon. The main goal of this project is to scrape texts so that I can use them as training data for something else. This is the first time I've done something like this. I just read about half of a book on Python today and most of this was done with Claude Code. If it weren't the middle of the night I'm sure it'd be better. I am sure there are millions of better ways to build a text scraper, but this is my "learning experience" / poor attempt. Project Status: It's a mess but it works I guess. Performance Notes: Poor, but it's like 4AM rn. Issues Found: There are a lot of issues. I have no idea why we even need to do the post-processing, there's some real problem with how index files are handled. IF I ever have cause to return to this project it'll be to fix that. Also the main scraper is like 1k lines of incomprehensible spaghetti.
 
 ## Project Overview
@@ -159,6 +161,6 @@ python3 combined_latin_processor.py --mode full --max-concurrent 50 --output-dir
 ## Data Sources
 
 - **Primary**: Vicifons (la.wikisource.org) - Latin Wikisource
-- **Metadata**: XML dump analysis for comprehensive work discovery
+- **Metadata**: XML dump analysis for comprehensive work discovery ( You can download the latest XML dump from https://dumps.wikimedia.org/lawikisource/20250801/ )
 - **Coverage**: Classical Latin (1st century B.C. - 5th century A.D.) through Early Renaissance (~1600)
 - **Content Types**: Complete works, book chapters, substantial excerpts
