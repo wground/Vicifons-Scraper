@@ -1,4 +1,0 @@
-pywikibot>=7.0.0
-requests>=2.25.0
-aiohttp>=3.8.0
-aiofiles>=0.8.0
