@@ -2,6 +2,8 @@
 
 ## Notes
 
+August 13: Minor improvements to enhanced_cleaner.py and orthography.py.
+
 August 12: Improved removal of chapter headings. Still need to look into caching problems if I ever need to re-scrape, or repurpose this code to scrape something else.
 
 August 11: Revised everything and updated to current version, merging scraping and cleaning functionality. Spent a lot of time trying to figure out the best way to scale scraping, though I'm still not really certain that we're good. There is a known issue with caching harming download speed about halfway throught the Vicifons filtered corpus. You may ask me: 'couldn't this be much easier if you just took directly from the XML datadump?' I answer: yes, but.

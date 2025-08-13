@@ -169,32 +169,106 @@ class OrthographyStandardizer:
         return text
     
     def normalize_classical_spelling(self, text: str) -> str:
-        """Normalize to classical Latin spelling conventions."""
-        # J -> I conversion (but preserve consonantal J at word beginnings)
-        text = re.sub(r'\bj', 'i', text, flags=re.IGNORECASE)  # Word-initial j -> i
-        text = re.sub(r'([aeiou])j', r'\1i', text, flags=re.IGNORECASE)  # Vowel + j -> vowel + i
-        text = re.sub(r'j([aeiou])', r'i\1', text, flags=re.IGNORECASE)  # j + vowel -> i + vowel
+        """Normalize to classical Latin spelling conventions with enhanced v/u and j/i handling."""
         
-        # V -> U conversion in vowel positions
-        text = re.sub(r'([aeiou])v([aeiou])', r'\1u\2', text, flags=re.IGNORECASE)  # vowel-v-vowel
-        text = re.sub(r'\bv([aeiou])', r'v\1', text, flags=re.IGNORECASE)  # Keep initial V before vowel (consonantal)
-        text = re.sub(r'([bcdfghlmnpqrst])v([aeiou])', r'\1u\2', text, flags=re.IGNORECASE)  # consonant-v-vowel -> consonant-u-vowel
-        
-        # Special cases for common words
-        replacements = {
+        # First, handle specific common classical words with precise patterns
+        classical_word_fixes = {
+            # V/U normalization for very common words
             r'\bvnvs\b': 'unus',
             r'\bvti\b': 'uti', 
             r'\bvt\b': 'ut',
             r'\bsva\b': 'sua',
-            r'\bsvvs\b': 'suus',
+            r'\bsvvs\b': 'suus', 
+            r'\bsvae\b': 'suae',
+            r'\bsvam\b': 'suam',
             r'\bqvod\b': 'quod',
             r'\bqvae\b': 'quae',
             r'\bqvi\b': 'qui',
+            r'\bqvem\b': 'quem',
+            r'\bqvam\b': 'quam',
+            r'\bqvibus\b': 'quibus',
+            r'\bqvorvm\b': 'quorum',
+            r'\bqvarvm\b': 'quarum',
             r'\bvbi\b': 'ubi',
             r'\bvnde\b': 'unde',
+            r'\bvnvm\b': 'unum',
+            r'\bvnam\b': 'unam',
+            r'\bvllo\b': 'ullo',
+            r'\bvlla\b': 'ulla',
+            r'\bvnqvam\b': 'unquam',
+            r'\bvtiqve\b': 'utique',
+            r'\bplvrimvs\b': 'plurimus',
+            r'\bplvrima\b': 'plurima',
+            r'\bplvrimvm\b': 'plurimum',
+            r'\bpopvlvs\b': 'populus',
+            r'\bpopvli\b': 'populi',
+            r'\bpopvlo\b': 'populo',
+            r'\bpopvlvm\b': 'populum',
+            r'\bconsulibus\b': 'consulibus',
+            r'\bconsvl\b': 'consul',
+            r'\bconsvles\b': 'consules',
+            r'\bconsvlvm\b': 'consulem',
+            r'\bconsvlibus\b': 'consulibus',
+            
+            # J/I normalization for common words  
+            r'\bidem\b': 'idem',
+            r'\bjam\b': 'iam',
+            r'\bjdemque\b': 'idemque',
+            r'\bmajor\b': 'maior',
+            r'\bmajores\b': 'maiores',
+            r'\bmajorem\b': 'maiorem',
+            r'\bmajus\b': 'maius',
+            r'\bpeior\b': 'peior',  # Keep as is - correct
+            r'\bpejor\b': 'peior',   # Fix alternative spelling
+            r'\bmejor\b': 'melior',  # Fix common error
+            r'\bjulius\b': 'Iulius',
+            r'\bjulia\b': 'Iulia',
+            r'\bjustus\b': 'iustus',
+            r'\bjustum\b': 'iustum',
+            r'\bjusta\b': 'iusta',
+            r'\bjustitia\b': 'iustitia',
         }
         
-        for pattern, replacement in replacements.items():
+        # Apply word-specific fixes first (most precise)
+        for pattern, replacement in classical_word_fixes.items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+        
+        # J -> I conversion (enhanced with better context awareness)
+        # Handle word-initial j -> i (but be careful with proper names)
+        text = re.sub(r'\bj([aeiou])', r'i\1', text, flags=re.IGNORECASE)  
+        # Handle j between vowels or after vowels
+        text = re.sub(r'([aeiou])j([aeiou])', r'\1i\2', text, flags=re.IGNORECASE)
+        text = re.sub(r'([aeiou])j\b', r'\1i', text, flags=re.IGNORECASE)
+        text = re.sub(r'([aeiou])j([bcdfghlmnpqrstvwxyz])', r'\1i\2', text, flags=re.IGNORECASE)
+        
+        # V -> U conversion in vowel positions (enhanced)
+        # Handle vowel-v-vowel sequences
+        text = re.sub(r'([aeiou])v([aeiou])', r'\1u\2', text, flags=re.IGNORECASE)
+        # Handle consonant-v-vowel where v is clearly vocalic
+        text = re.sub(r'([bcdfghlmnpqrst])v([aeiou])', r'\1u\2', text, flags=re.IGNORECASE)
+        # Handle v after consonants when followed by consonants (likely vocalic)
+        text = re.sub(r'([bcdfghlmnpqrst])v([mnlr])', r'\1u\2', text, flags=re.IGNORECASE)
+        # Handle final -vs endings (common genitive/nominative)
+        text = re.sub(r'([aeiou])vs\b', r'\1us', text, flags=re.IGNORECASE)
+        # Handle -vm endings (accusative)
+        text = re.sub(r'([aeiou])vm\b', r'\1um', text, flags=re.IGNORECASE)
+        
+        # Keep initial V before vowels (consonantal V)
+        # This is already handled by the patterns above
+        
+        # Additional common suffixes and patterns
+        suffix_patterns = {
+            r'([aeiou])vnt\b': r'\1unt',      # 3rd person plural -unt
+            r'([aeiou])vntur\b': r'\1untur',  # 3rd person plural passive
+            r'([aeiou])vndvs\b': r'\1undus',  # gerundive -undus
+            r'([aeiou])vnda\b': r'\1unda',    # gerundive -unda
+            r'([aeiou])vndvm\b': r'\1undum',  # gerundive -undum
+            r'tivs\b': 'tius',                # -tius endings
+            r'tiva\b': 'tia',                 # -tia endings  
+            r'tivm\b': 'tium',                # -tium endings
+        }
+        
+        for pattern, replacement in suffix_patterns.items():
             text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
         
         return text

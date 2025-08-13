@@ -125,6 +125,25 @@ class EnhancedTextCleaner:
             r'copyright.*?$',
             r'©.*?$',
             r'all rights reserved.*?$',
+            
+            # Modern language references and translations (ENHANCED)
+            r'\b[a-z]{2,3}:\s*[а-яё\u0100-\u017F\u1E00-\u1EFF]+.*?$',  # Language codes followed by non-Latin text
+            r'\b(en|fr|de|it|es|pl|ru|be|ua|cz|sk|hu|ro|bg|hr|sl|mk|sr|bs|lv|lt|et|fi|sv|no|da|nl|pt|ca|eu|gl|mt|cy|ga|gd|br|is|fo|kl):\s*.*?$',
+            r'\bbagarodziśa\b.*?$',  # Specific Belarusian text
+            r'\bbogurodzica\b.*?$',   # Specific Polish text
+            r'\b[а-яёіуэ]+\b.*?$',    # Cyrillic script
+            r'\b[αβγδεζηθικλμνξοπρστυφχψω]+\b.*?$',  # Greek script
+            
+            # Editorial and academic references (ENHANCED)
+            r'i-vi,?\s*comm\.?\s*f\.?\s*r\.?\s*d\.?\s*goodyear,?\s*cambridge.*?$',
+            r'comm\.?\s*[a-z]\.\s*[a-z]\.\s*[a-z]\.\s*[a-z]+,?\s*cambridge.*?$',
+            r'cf\.?\s*[a-z]\.\s*[a-z]\.\s*[a-z]+.*?cambridge.*?$',
+            r'vide\s+[a-z]+.*?cambridge.*?$',
+            r'see\s+[a-z]+.*?cambridge.*?$',
+            r'cambridge\s*,\s*\d*\s*,?\s*\.?$',
+            r'oxford\s+classical\s+texts.*?$',
+            r'teubner.*?edition.*?$',
+            r'loeb\s+classical\s+library.*?$',
         ]
         
         return [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in patterns]
@@ -505,6 +524,87 @@ class EnhancedTextCleaner:
         # Analyze content structure (fallback)
         return detect_text_type(content)
     
+    def remove_trailing_non_latin_content(self, content: str) -> str:
+        """Remove trailing non-Latin content, language references, and editorial notes."""
+        
+        # First handle content that might be all on one line
+        # Look for language codes followed by non-Latin text at the end
+        language_code_patterns = [
+            r'\s+[a-z]{2,3}:\s*[а-яё\u0100-\u017F\u1E00-\u1EFF]+.*?$',  # Language codes followed by non-Latin text
+            r'\s+be:\s*багародзіца.*?$',  # Specific Belarusian
+            r'\s+en:\s*bogurodzica.*?$',   # Specific English
+            r'\s+pl:\s*bogurodzica.*?$',   # Specific Polish
+            r'\s+comm\.?\s*[a-z]\.\s*[a-z]\.\s*[a-z].*?$',  # Editorial abbreviations
+            r'\s+cambridge\s*,\s*\d*\s*,?\s*\.?$',
+            r'\s+oxford\s+classical.*?$',
+            r'\s+teubner.*edition.*?$',
+            r'\s+loeb\s+classical.*?$',
+        ]
+        
+        # Remove single-line trailing non-Latin content
+        for pattern in language_code_patterns:
+            content = re.sub(pattern, '', content, flags=re.IGNORECASE)
+        
+        # Now handle line-by-line approach for multi-line content
+        lines = content.split('\n')
+        
+        # Work backwards from the end to find where Latin content ends
+        latin_end = len(lines)
+        
+        # Patterns that indicate non-Latin or metadata content
+        non_latin_patterns = [
+            r'^[a-z]{2,3}:\s*',  # Language codes (en:, fr:, pl:, etc.)
+            r'[а-яё]',           # Cyrillic characters
+            r'[αβγδεζηθικλμνξοπρστυφχψω]',  # Greek characters
+            r'\bbagarodziśa\b',  # Specific non-Latin words
+            r'\bbogurodzica\b',
+            r'comm\.?\s*[a-z]\.\s*[a-z]\.\s*[a-z]',  # Editorial abbreviations
+            r'cambridge\s*,\s*\d*\s*,?\s*\.?$',
+            r'oxford\s+classical',
+            r'teubner.*edition',
+            r'loeb\s+classical',
+            r'^[^\w]*$',  # Lines with only punctuation/whitespace
+        ]
+        
+        compiled_patterns = [re.compile(p, re.IGNORECASE) for p in non_latin_patterns]
+        
+        # Scan backwards to find last legitimate Latin content
+        for i in range(len(lines) - 1, -1, -1):
+            line = lines[i].strip()
+            
+            # Skip empty lines
+            if not line:
+                continue
+                
+            # Check if this line contains non-Latin patterns
+            is_non_latin = False
+            for pattern in compiled_patterns:
+                if pattern.search(line):
+                    is_non_latin = True
+                    self.logger.debug(f"Detected non-Latin trailing content: '{line}'")
+                    break
+            
+            if is_non_latin:
+                # This line and everything after should be removed
+                latin_end = i
+                continue
+            
+            # If we have substantial Latin content, this is probably the end
+            if len(line) > 10 and re.search(r'[a-zA-Z]', line):
+                # Check if it looks like Latin (has common Latin words/patterns)
+                latin_indicators = ['et', 'in', 'ad', 'cum', 'de', 'est', 'sunt', 'qui', 'quae', 'sed', 'ut']
+                if any(word in line.lower() for word in latin_indicators) or len(line) > 30:
+                    break
+        
+        # Keep content only up to the Latin end
+        cleaned_lines = lines[:latin_end]
+        result = '\n'.join(cleaned_lines)
+        
+        # Final cleanup - remove any remaining language references
+        result = re.sub(r'\s+[a-z]{2,3}:\s*\S+', '', result, flags=re.IGNORECASE)
+        
+        return result
+
     def aggressive_metadata_removal(self, content: str) -> str:
         """Aggressively remove all non-Latin metadata and export information."""
         lines = content.split('\n')
@@ -529,6 +629,9 @@ class EnhancedTextCleaner:
             content = '\n'.join(lines[content_start:])
         else:
             content = '\n'.join(lines)
+        
+        # Remove trailing non-Latin content (ENHANCED)
+        content = self.remove_trailing_non_latin_content(content)
         
         # Pre-remove wiki table syntax that might be mixed with metadata
         wiki_table_patterns = [
@@ -654,8 +757,8 @@ class EnhancedTextCleaner:
             r'.*marcus tulli ciceronis.*',
             r'.*pro aut\..*vel\..*',
             
-            # Very short lines that are likely headings (but keep reasonable content)
-            r'^\s*[A-Z\s]{1,15}\s*\.?\s*$',  # Very short all-caps lines
+            # Very short lines that are likely headings (but preserve poetry)
+            r'^\s*[A-Z\s]{1,8}\s*\.\s*$',  # Only remove very short all-caps lines ending with period
         ]
         
         compiled_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in heading_patterns]
@@ -672,11 +775,20 @@ class EnhancedTextCleaner:
             is_heading = False
             for pattern in compiled_patterns:
                 if pattern.match(stripped_line):
-                    # Additional check: if it's a very short line pattern, make sure it's not meaningful content
-                    if 'A-Z' in pattern.pattern and len(stripped_line) > 3:
+                    # POETRY-SAFE: Additional checks to preserve poetic content
+                    if 'A-Z' in pattern.pattern:
                         # Check if it contains common Latin words - if so, keep it
-                        latin_indicators = ['et', 'ad', 'in', 'de', 'cum', 'ex', 'ab', 'pro', 'per']
+                        latin_indicators = ['et', 'ad', 'in', 'de', 'cum', 'ex', 'ab', 'pro', 'per', 'est', 'sunt', 'non', 
+                                          'sed', 'ut', 'que', 'vel', 'aut', 'nec', 'si', 'te', 'me', 'nos', 'vos']
                         if any(word in stripped_line.lower() for word in latin_indicators):
+                            continue
+                        
+                        # Check if it looks like a poetic line (has vowels in Latin pattern)
+                        if re.search(r'[aeiou].*[aeiou]', stripped_line.lower()) and len(stripped_line) > 2:
+                            continue
+                        
+                        # Only remove if it's clearly structural (very short with period or obvious heading pattern)
+                        if not (len(stripped_line) <= 3 or stripped_line.endswith('.') or 'liber' in stripped_line.lower() or 'capitulum' in stripped_line.lower()):
                             continue
                     
                     is_heading = True
@@ -695,36 +807,44 @@ class EnhancedTextCleaner:
     
     def remove_modern_formatting(self, content: str) -> str:
         """Remove parentheses, brackets, and Arabic numerals that interfere with pure Latin text."""
-        # Remove parenthetical content that's likely editorial
-        content = re.sub(r'\([^)]*\)', '', content)  # Remove (content)
-        content = re.sub(r'\[[^\]]*\]', '', content)  # Remove [content]
+        # POETRY-SAFE: Only remove obvious editorial content in parentheses/brackets
+        # Remove parenthetical content that's clearly editorial (not short poetic content)
+        content = re.sub(r'\([^)]{20,}\)', '', content)  # Only remove long parenthetical content
+        content = re.sub(r'\[[^\]]{20,}\]', '', content)  # Only remove long bracketed content
         
-        # Remove standalone Arabic numerals (but preserve Roman numerals)
-        # Be careful not to remove numbers that are part of words or dates that might be important
-        content = re.sub(r'\b\d+\b', '', content)  # Remove standalone numbers
-        content = re.sub(r'^\d+\.', '', content, flags=re.MULTILINE)  # Remove numbered list items
+        # Remove specific editorial patterns in parentheses/brackets
+        content = re.sub(r'\([Pp]age? \d+\)', '', content)  # (page 123)
+        content = re.sub(r'\([Ll]ine? \d+\)', '', content)  # (line 45)
+        content = re.sub(r'\([Ee]d\.?\)', '', content)  # (ed.)
+        content = re.sub(r'\([Cc]f\.? [^)]+\)', '', content)  # (cf. reference)
+        content = re.sub(r'\[[Nn]ote:? [^\]]+\]', '', content)  # [note: ...]
+        content = re.sub(r'\[[Ee]d\.?:? [^\]]+\]', '', content)  # [ed: ...]
         
-        # Remove specific formatting artifacts
+        # POETRY-SAFE: Only remove numbered list items, not all standalone numbers
+        content = re.sub(r'^\d+\.\s+', '', content, flags=re.MULTILINE)  # Remove "1. " list prefixes
+        content = re.sub(r'^\d+\)\s+', '', content, flags=re.MULTILINE)  # Remove "1) " list prefixes
+        
+        # Remove specific formatting artifacts (but preserve poetic structure)
         content = re.sub(r'^\*+\s*', '', content, flags=re.MULTILINE)  # Remove asterisk bullets
         content = re.sub(r'Pag\.\s*\d+', '', content)  # Remove page references
         content = re.sub(r'lin\.\s*\d+', '', content)  # Remove line references
         content = re.sub(r'\d+\.\s*\d+\.\s*\d+\.', '', content)  # Remove version-like numbers
         
-        # Remove years in parentheses that might have been missed
-        content = re.sub(r'\(\d{3,4}\)', '', content)  # Remove years like (1245)
+        # Remove years in parentheses that might have been missed (only 4-digit years)
+        content = re.sub(r'\(\d{4}\)', '', content)  # Remove years like (1245)
         
         # Clean up any double spaces left behind
         content = re.sub(r'\s+', ' ', content)
         content = re.sub(r'^\s+|\s+$', '', content, flags=re.MULTILINE)
         
-        # Remove lines that became empty or only contain punctuation
+        # POETRY-SAFE: Keep even very short lines that contain letters
         lines = content.split('\n')
         cleaned_lines = []
         
         for line in lines:
             stripped = line.strip()
-            # Keep line if it has actual letters, not just punctuation/whitespace
-            if re.search(r'[A-Za-z]', stripped) and len(stripped) > 2:
+            # Keep line if it has any letters at all (including single-letter lines for poetry)
+            if re.search(r'[A-Za-z]', stripped):
                 cleaned_lines.append(line)
             elif not stripped:  # Keep empty lines for formatting
                 cleaned_lines.append(line)
@@ -738,17 +858,21 @@ class EnhancedTextCleaner:
     
     def final_latin_validation(self, content: str) -> Tuple[str, bool]:
         """Final validation and cleanup to ensure Latin-only content.""" 
-        # Final cleanup
-        clean_content = re.sub(r'\s+', ' ', content)
-        clean_content = re.sub(r'^\s+|\s+$', '', clean_content)
+        # POETRY-SAFE: Preserve line breaks and spacing for poetry
+        # Only clean up excessive whitespace, not all spacing
+        clean_content = re.sub(r'[ \t]+', ' ', content)  # Only collapse horizontal whitespace
+        clean_content = re.sub(r'^\s+|\s+$', '', clean_content, flags=re.MULTILINE)  # Trim line edges
+        clean_content = clean_content.strip()
         
-        # Much more lenient validation - accept almost all content that has reasonable length
-        if len(clean_content) < 30:  # Reduced from 50
+        # Very lenient validation - accept almost all content that has reasonable length
+        if len(clean_content) < 10:  # Even more reduced threshold for poetry
             return clean_content, False
         
         # Check for basic Latin indicators or classical text patterns
         latin_words = ['et', 'in', 'ad', 'cum', 'de', 'per', 'pro', 'est', 'sunt', 'qui', 'quae', 'sed', 'ut', 'ex', 'ab', 
-                      'que', 'ne', 'enim', 'non', 'si', 'sic', 'hic', 'ille', 'ipse', 'rex', 'deus', 'homo', 'res', 'via']
+                      'que', 'ne', 'enim', 'non', 'si', 'sic', 'hic', 'ille', 'ipse', 'rex', 'deus', 'homo', 'res', 'via',
+                      'maria', 'domini', 'dei', 'iesu', 'christe', 'mater', 'caritas', 'pietas', 'nos', 'audi', 'domine',
+                      'amor', 'vita', 'mors', 'pax', 'lux', 'nox', 'dies', 'annus', 'tempus', 'carmen', 'versus', 'terra']
         
         # Classical text patterns (common in poetry/prose)
         classical_patterns = [
@@ -757,6 +881,12 @@ class EnhancedTextCleaner:
             r'[aeiou]s\b',  # various case endings
             r'[aeiou]rum\b',  # genitive plural
             r'tio[nms]?\b',  # -tion words common in Latin
+            r'us\b',  # common Latin endings
+            r'um\b',  # common Latin endings
+            r'is\b',  # common Latin endings
+            r'ae\b',  # common Latin endings
+            r'or\b',  # common Latin endings
+            r'ur\b',  # passive endings
         ]
         
         word_count = len(re.findall(r'\w+', clean_content.lower()))
@@ -765,19 +895,20 @@ class EnhancedTextCleaner:
         # Check for classical patterns
         pattern_matches = 0
         for pattern in classical_patterns:
-            if re.search(pattern, clean_content.lower()):
-                pattern_matches += 1
+            matches = len(re.findall(pattern, clean_content.lower()))
+            pattern_matches += matches
         
-        # Accept if has reasonable Latin word density OR classical patterns OR reasonable overall structure
-        has_latin_words = latin_word_count >= 2  # Reduced threshold
-        has_classical_patterns = pattern_matches >= 2
-        reasonable_length = word_count >= 15  # Reduced threshold
+        # POETRY-SAFE: Even more permissive for short poetic fragments
+        has_latin_words = latin_word_count >= 1
+        has_classical_patterns = pattern_matches >= 2  # Reduced threshold for poetry
+        reasonable_length = word_count >= 5  # Much reduced threshold for poetry fragments
         
-        # Much more permissive: accept if ANY of these conditions are met
-        is_valid = (has_latin_words and reasonable_length) or has_classical_patterns or word_count >= 100
+        # Very permissive: accept if ANY of these conditions are met
+        is_valid = (has_latin_words and reasonable_length) or has_classical_patterns or word_count >= 20
         
         if not is_valid:
             self.logger.debug(f"Text rejected: words={word_count}, latin_words={latin_word_count}, patterns={pattern_matches}")
+            self.logger.debug(f"Content preview: {clean_content[:100]}...")
         
         return clean_content, is_valid
     
