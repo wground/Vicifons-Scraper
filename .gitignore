@@ -1,0 +1,39 @@
+# XML dumps (huge)
+*.xml
+
+# Output directories
+processed_latin_texts/
+output/
+
+# Generated JSON work lists (in _legacy/)
+_legacy/*.json
+_legacy/**/*.json
+
+# Claude Code
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
